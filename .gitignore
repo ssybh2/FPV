@@ -1,0 +1,39 @@
+# ROS / catkin build outputs
+build/
+devel/
+install/
+logs/
+.log/
+*.log
+
+# ROS bags
+*.bag
+*.bag.active
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.venv/
+venv/
+
+# Large archives / binaries
+*.tar
+*.tar.gz
+*.tar.xz
+*.zip
+*.7z
+
+# Flightmare Unity binary
+RPG_Flightmare/
+RPG_Flightmare.tar.xz
+*.x86_64
+UnityPlayer.so
+*_Data/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+*.swp
