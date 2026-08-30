@@ -1,61 +1,11 @@
-# ROS / catkin build outputs
-build/
-devel/
-install/
-logs/
-.log/
-*.log
-
-# ROS bags
-*.bag
-*.bag.active
-
-# Python
 __pycache__/
-*.pyc
-*.pyo
+*.py[cod]
 *.egg-info/
-.venv/
-venv/
-
-# Large archives / binaries
-*.tar
-*.tar.gz
-*.tar.xz
-*.zip
-*.7z
-
-# Flightmare Unity binary
-RPG_Flightmare/
-RPG_Flightmare.tar.xz
-*.x86_64
-UnityPlayer.so
-*_Data/
-
-# Editor / OS
+build/
+dist/
 .vscode/
 .idea/
-.DS_Store
-*.swp
-
-# ==================================================
-# Q250 Isaac Lab local/generated files
-# ==================================================
 logs/
 outputs/
-runs/
-wandb/
-__pycache__/
-*.pyc
-*.pyo
-.pytest_cache/
-*.egg-info/
-.vscode/
-.idea/
-
-# TensorBoard runtime files
-events.out.tfevents.*
-
-# Temporary archives
-*.zip
-
+*.pt
+*.pth

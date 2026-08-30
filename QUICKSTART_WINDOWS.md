@@ -1,4 +1,4 @@
-# Windows quick start — v0.3.0 Fly-to-Point RL
+# Windows Quick Start — v0.4.0 Gate Racing
 
 Assumed Isaac Lab Python:
 
@@ -8,103 +8,79 @@ E:\IsaacWork\env_isaaclab\python.exe
 
 ## 1. Extract
 
-Recommended:
+Recommended directory:
 
 ```text
-E:\IsaacWork\Q250_UZH_Racing_v0.3.0
+E:\IsaacWork\Q250_UZH_Racing_v0.4.0
 ```
 
-## 2. Install and run pure tests
+## 2. Setup
 
 ```powershell
-cd E:\IsaacWork\Q250_UZH_Racing_v0.3.0
+cd E:\IsaacWork\Q250_UZH_Racing_v0.4.0
 Set-ExecutionPolicy -Scope Process Bypass
 .\setup.ps1
 ```
 
-The environment probe must find: `isaaclab`, `isaacsim`, `torch`, `isaaclab_rl`, and `rsl_rl`.
-
-## 3. Fast RL environment smoke test
+## 3. Gate environment smoke test
 
 ```powershell
-.\smoke_rl.ps1
+.\smoke_gate.ps1
 ```
 
 Expected essentials:
 
 ```text
-observation  : (32, 12)
-action       : (32, 4)
+observation    : (32, 12)
+action         : (32, 4)
 finite tensors : True
-mean z       : close to 1.5 m for zero CTBR action
 ```
 
-If this fails, stop here and send the complete terminal output.
+Zero action is still hover-centered, so a 2-second smoke test should not produce a violent crash.
 
-## 4. Start PPO training
-
-Recommended first run:
+## 4. Train
 
 ```powershell
-.\train_rl.ps1 -NumEnvs 512 -MaxIterations 300
+.\train_gate.ps1 -NumEnvs 512 -MaxIterations 400
 ```
 
-Faster debugging run:
-
-```powershell
-.\train_rl.ps1 -NumEnvs 128 -MaxIterations 20
-```
-
-More parallel environments if your GPU has room:
-
-```powershell
-.\train_rl.ps1 -NumEnvs 1024 -MaxIterations 300
-```
-
-Training is headless by default for speed. Logs/checkpoints appear in:
-
-```text
-logs\rsl_rl\q250_fly_to_point\<timestamp>\
-```
+Training is headless by default.
 
 ## 5. TensorBoard
 
-Open another PowerShell in the workspace:
+In another PowerShell:
 
 ```powershell
 .\tensorboard.ps1
 ```
 
-Then open `http://localhost:6006`.
+Watch:
 
-Useful curves:
-
-- `Train/mean_reward`
-- `Train/mean_episode_length`
-- `Episode_Reward/progress`
-- `Episode_Reward/success`
-- `Episode_Reward/crash`
-- `Metrics/final_distance_m`
-- `Metrics/success_rate`
+- `Metrics/race_success_rate`
+- `Metrics/gate_completion_fraction`
+- `Metrics/missed_gate_rate`
+- `Metrics/allocator_saturation_rate`
+- `Metrics/episode_time_s`
 - `Curriculum/stage`
 
-## 6. Play the newest model
+## 6. UI playback
+
+Hardest three-gate stage:
 
 ```powershell
-.\play_rl.ps1
+.\play_gate.ps1 -Stage 2 -Duration 0 -RealTime
 ```
 
-The script automatically finds the newest `model_*.pt` checkpoint. To use an explicit checkpoint:
+One standard gate:
 
 ```powershell
-.\play_rl.ps1 -Checkpoint "E:\IsaacWork\Q250_UZH_Racing_v0.3.0\logs\rsl_rl\q250_fly_to_point\2026-08-30_12-00-00\model_299.pt"
+.\play_gate.ps1 -Stage 1 -Duration 0 -RealTime
 ```
 
-## 7. Existing validation tools remain available
+Use a specific checkpoint:
 
 ```powershell
-.\run_hover.ps1
-.\run_rate_step.ps1 -Axis roll -Rate 100
-.\run_rate_step.ps1 -Axis pitch -Rate 100
-.\run_rate_step.ps1 -Axis yaw -Rate 100
+.\play_gate.ps1 -Checkpoint "E:\path\to\model_200.pt" -Stage 2 -Duration 0 -RealTime
 ```
+
+Orange = gate frames. Green cube = current gate center.
