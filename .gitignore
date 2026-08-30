@@ -37,3 +37,25 @@ UnityPlayer.so
 .idea/
 .DS_Store
 *.swp
+
+# ==================================================
+# Q250 Isaac Lab local/generated files
+# ==================================================
+logs/
+outputs/
+runs/
+wandb/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+*.egg-info/
+.vscode/
+.idea/
+
+# TensorBoard runtime files
+events.out.tfevents.*
+
+# Temporary archives
+*.zip
+
