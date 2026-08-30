@@ -2,7 +2,7 @@ from setuptools import find_packages, setup
 
 setup(
     name="q250-uzh-isaaclab",
-    version="0.4.0",
+    version="0.5.0",
     description="Q250 dynamics workspace for UZH-style drone racing in Isaac Lab",
     packages=find_packages(),
     include_package_data=True,

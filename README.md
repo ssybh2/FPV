@@ -1,169 +1,235 @@
-# Q250 UZH-style Drone Racing Workspace — v0.4.0
+# Q250 UZH-style Drone Racing Workspace — v0.5.0
 
-External Windows + Isaac Lab workspace for a Q250 racing quadrotor. The project does **not** modify the Isaac Lab source tree.
+Windows + Isaac Lab workspace for a Q250 racing quadrotor. This release is the **Look-Ahead Racing** stage built on the validated v0.4.0 three-gate policy.
 
-## Current status
+## Status
 
-- Phase 0: Q250 physics + motor model + PhysX hover — **validated on Windows**
-- Phase 1: body-rate PID + motor allocator — **validated from roll/pitch/yaw step logs**
-- Phase 2: Fly-to-Point RL — **passed; model around iteration 200 visually validated**
-- Phase 3: Gate Racing curriculum — **implemented in v0.4.0**
+- Phase 0: Q250 physics + identified motor model + PhysX hover — validated
+- Phase 1: body-rate PID + motor allocator — validated
+- Phase 2: Fly-to-Point RL — validated (`model_200` milestone)
+- Phase 3: three-gate racing — validated (`model_399` milestone)
+- Phase 4: **Look-Ahead Racing — v0.5.0**
 
-## Physical model kept unchanged
+The physical Q250 model and CTBR inner-loop architecture are unchanged.
 
-- mass: `1.0006 kg`
-- inertia: `Ix=0.00517`, `Iy=0.00484`, `Iz=0.00750 kg m^2`
-- Q250 diagonal motor spacing: `250 mm`
-- M1 front-left CCW, M2 front-right CW, M3 rear-right CCW, M4 rear-left CW
-- `Kt = 1.3287717252618608e-6 N/(rad/s)^2`
-- `Kq = 1.772957417327994e-8 N m/(rad/s)^2`
-- measured motor LUT: `q250_uzh/data/motor_lut.csv`
-- motor first-order lag: `tau = 0.10 s` (provisional)
+## Main v0.5.0 idea
 
-## v0.4.0 architecture
+v0.4.0 only saw the current gate. v0.5.0 sees both the current and next gate, plus their normals, so the policy can begin turning **before** crossing the current gate.
 
-The 12-D observation and 4-D CTBR action interface are intentionally preserved from v0.3.0.
+The old 12-D observation is preserved as the first 12 columns:
 
 ```text
-12-D privileged observation
-[current_gate_center_b, v_b, gravity_b, omega_b]
-                  |
-                  v
-               PPO policy
-                  |
-       normalized CTBR [-1,1]^4
-                  |
-                  v
-       [T, p_cmd, q_cmd, r_cmd]
-                  |
-                  v
-        Body-rate PID @ 240 Hz
-                  |
-                  v
-            Motor allocator
-                  |
-                  v
-       motor lag + Kt*w^2/Kq*w^2
-                  |
-                  v
-              Isaac PhysX
+0:3    current gate position in body frame
+3:6    body linear velocity
+6:9    projected gravity
+9:12   body angular velocity
+12:15  next gate position in body frame        NEW
+15:18  current gate normal in body frame       NEW
+18:21  next gate normal in body frame          NEW
 ```
 
-Policy frequency remains 60 Hz (`dt=1/240`, `decimation=4`).
+Total: **21-D**.
 
-## What counts as a gate pass
+Action remains the same 4-D CTBR command:
 
-A gate is not a waypoint. The Q250 must:
+```text
+[collective thrust, roll-rate cmd, pitch-rate cmd, yaw-rate cmd]
+```
 
-1. approach from the negative side of the gate plane;
-2. cross the plane in the forward direction;
-3. have its vehicle center inside the rectangular opening at the crossing instant.
+The control stack remains:
 
-Crossing the plane outside the opening is a **miss** and terminates the episode.
+```text
+21-D privileged observation
+          |
+          v
+       PPO policy
+          |
+          v
+  [T, p_cmd, q_cmd, r_cmd]
+          |
+          v
+  Body-rate PID @ 240 Hz
+          |
+          v
+    Motor allocator
+          |
+          v
+identified motor lag + Kt*w^2/Kq*w^2
+          |
+          v
+      Isaac PhysX Q250
+```
 
-In v0.4.0 gate frames are visual markers, while this plane-crossing geometry is the authoritative training rule. Physical gate-frame collision is intentionally deferred until the racing policy is reliable.
+## v0.4 -> v0.5 weight transfer
+
+This release does **not** start from scratch.
+
+`model_399.pt` has a 12-D actor and critic input. The transfer utility expands both first layers from:
+
+```text
+12 -> 128
+```
+
+to:
+
+```text
+21 -> 128
+```
+
+Transfer rule:
+
+- old first 12 columns: copied exactly;
+- new 9 columns: initialized to exactly zero;
+- all compatible deeper actor/critic weights: copied exactly;
+- PPO optimizer: fresh;
+- exploration-noise parameter: intentionally reset to the lower v0.5 value instead of copying late v0.4 noise.
+
+Therefore the new policy begins with nearly the same behavior as v0.4, then learns how to use the nine new look-ahead features.
 
 ## Curriculum
 
-The curriculum uses the same global policy-step timing style as v0.3.0:
-
 | Stage | Global policy steps | Task |
 |---|---:|---|
-| 0 | `< 800` | one large `3.0 x 3.0 m` gate |
-| 1 | `800..2399` | one standard `1.5 x 1.5 m` gate |
-| 2 | `>= 2400` | three sequential `1.5 x 1.5 m` gates |
+| 0 | `<1000` | 3 vertical gates, 1.8 m opening; transfer adaptation |
+| 1 | `1000..2999` | 3 gates, 1.5 m opening, yaw/pitch randomized |
+| 2 | `>=3000` | 5 oriented 1.5 m gates, larger lateral/vertical variation |
 
-All v0.4.0 gates are vertical and face `+X`. Gate centers randomize laterally and vertically. This is deliberate: the next version will add gate yaw/pitch, next-gate preview and true corner-cutting behavior.
+Stage 0 intentionally resembles v0.4.0. Stage 1 introduces orientation. Stage 2 is the first five-gate racing task.
 
-## Reward
+## Gate orientation
 
-- progress toward the **current gate center** (keeps the successful Fly-to-Point shaping)
-- gate-pass bonus
+Each gate has a real plane basis:
+
+- forward normal `n`
+- horizontal/right axis `r`
+- vertical/up axis `u`
+
+A pass requires forward plane crossing and the Q250 center to lie inside the rotated rectangular opening. The authoritative pass rule is geometric; the orange frame is visualization.
+
+## Reward changes
+
+v0.5.0 keeps the stable v0.4 reward components and adds a small look-ahead shaping term near the current gate:
+
+- progress to current gate
+- gate pass bonus
 - larger race-finish bonus
 - crash/missed-gate penalty
 - small action penalty
-- small time penalty to encourage faster completion
+- stronger time pressure
+- **small near-gate exit-velocity alignment toward the next gate**
 
-## PPO changes from v0.3.0
+The look-ahead term is deliberately small so it cannot make skipping the current gate profitable.
 
-The first Fly-to-Point run showed late-training exploration noise and allocator saturation rising strongly. Gate PPO therefore starts with lower exploration:
+## Fast deployment
 
-- `init_noise_std = 0.5`
-- `entropy_coef = 0.003`
-- `learning_rate = 4e-4`
-- default `400` iterations
+Extract to:
 
-## Fastest deployment
-
-```powershell
-cd E:\IsaacWork\Q250_UZH_Racing_v0.4.0
-Set-ExecutionPolicy -Scope Process Bypass
-.\setup.ps1
-.\smoke_gate.ps1
-.\train_gate.ps1 -NumEnvs 512 -MaxIterations 400
+```text
+E:\IsaacWork\Q250_UZH_Racing_v0.5.0
 ```
 
-If 512 environments is too heavy, use 256. If GPU/VRAM has room, try 1024.
+Then:
 
-Watch training:
+```powershell
+cd E:\IsaacWork\Q250_UZH_Racing_v0.5.0
+Set-ExecutionPolicy -Scope Process Bypass
+.\setup.ps1
+```
+
+### 1. Import the validated v0.4 model_399
+
+If your v0.4 workspace is still at the normal path, this is automatic:
+
+```powershell
+.\import_v04_checkpoint.ps1
+```
+
+If not:
+
+```powershell
+.\import_v04_checkpoint.ps1 -Source "E:\full\path\to\model_399.pt"
+```
+
+### 2. Smoke-test the new 21-D environment
+
+```powershell
+.\smoke_lookahead.ps1
+```
+
+Expected essentials:
+
+```text
+observation    : (32, 21)
+action         : (32, 4)
+finite tensors : True
+unit normals   : True
+```
+
+### 3. Verify the 12D -> 21D weight transfer
+
+```powershell
+.\verify_transfer.ps1
+```
+
+The critical line is:
+
+```text
+input layers expanded : 2
+```
+
+or more. Two means both actor and critic input layers were expanded successfully.
+
+### 4. Train
+
+```powershell
+.\train_lookahead.ps1 -NumEnvs 512 -MaxIterations 450
+```
+
+The transfer is automatic. The training script also saves `model_transfer_init.pt` before PPO modifies the transferred policy.
+
+### 5. TensorBoard
 
 ```powershell
 .\tensorboard.ps1
 ```
 
-Play the newest gate checkpoint in the hardest 3-gate stage:
+Watch, in priority order:
+
+1. `Metrics/race_success_rate`
+2. `Metrics/gate_completion_fraction`
+3. `Metrics/missed_gate_rate`
+4. `Metrics/episode_time_s`
+5. `Metrics/gates_per_second`
+6. `Metrics/mean_speed_m_s`
+7. `Metrics/allocator_saturation_rate`
+8. `Episode_Reward/lookahead`
+9. `Curriculum/stage`
+
+### 6. UI playback
+
+Hardest stage, newest v0.5 checkpoint:
 
 ```powershell
-.\play_gate.ps1 -Stage 2 -Duration 0 -RealTime
+.\play_lookahead.ps1 -Stage 2 -Duration 0 -RealTime
 ```
 
-Stage-specific playback:
+UI colors:
 
-```powershell
-.\play_gate.ps1 -Stage 0 -Duration 0 -RealTime
-.\play_gate.ps1 -Stage 1 -Duration 0 -RealTime
-.\play_gate.ps1 -Stage 2 -Duration 0 -RealTime
-```
+- orange frame = gates
+- green cube = current gate
+- cyan cube = next gate
 
-In the UI:
+The behavior to look for is not merely higher success. The key qualitative sign is **pre-turning**: before crossing the green gate, the Q250 should already begin shaping its velocity toward the cyan next gate.
 
-- orange frames = gates
-- green cube = current gate center
+## Recommended success criterion
 
-## TensorBoard metrics to watch
+For Stage 2 five-gate racing, do not expect the v0.4 three-gate success number immediately. A useful v0.5 milestone is:
 
-Priority order:
-
-1. `Metrics/race_success_rate` — complete all currently active gates
-2. `Metrics/gate_completion_fraction` — fraction of the track completed
-3. `Metrics/missed_gate_rate` — crossed a gate plane outside the opening
-4. `Metrics/allocator_saturation_rate`
-5. `Metrics/episode_time_s` — once success is high, lower is faster
-6. `Episode_Reward/progress`, `gate`, `finish`, `crash`
-7. `Curriculum/stage`
-
-For Stage 2, a strong exit criterion is roughly:
-
-- race success consistently `> 80%`
-- gate completion `> 90%`
-- missed-gate rate low
-- no collapse in allocator saturation
-
-## New v0.4.0 files
-
-```text
-q250_uzh/gate_racing_math.py
-q250_uzh/tasks/gate_racing_env.py
-scripts/smoke_gate_racing.py
-scripts/train_gate_racing.py
-scripts/play_gate_racing.py
-smoke_gate.ps1
-train_gate.ps1
-play_gate.ps1
-```
-
-The Fly-to-Point environment and its scripts remain in the workspace for regression and comparison.
+- clear pre-turn / look-ahead behavior in UI;
+- gate completion trending upward through Stage 2;
+- five-gate race success becoming stable rather than collapsing;
+- episode time or gates/second improving without a large rise in missed gates.
 
 ## Coordinate convention
 
-Internal convention remains FLU / Z-up: +x forward, +y left, +z up. Do not mix it with PX4 FRD/NED without an explicit conversion layer.
+Internal convention remains FLU / Z-up: +x forward, +y left, +z up. PX4 FRD/NED must be handled by an explicit conversion layer.

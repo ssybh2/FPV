@@ -1,5 +1,25 @@
 # Changelog
 
+## v0.5.0 — Look-Ahead Racing + v0.4 Weight Transfer
+
+Added:
+
+- `Isaac-Q250-LookAheadRacing-Direct-v0`
+- 21-D observation preserving the old 12-D prefix
+- current + next gate position observation
+- current + next gate normal observation
+- fully rotated gate-plane crossing geometry
+- 3 vertical -> 3 oriented -> 5 oriented gate curriculum
+- small near-gate next-segment velocity-alignment reward
+- racing metrics: mean speed and gates/second
+- orange oriented gate frames, green current gate, cyan next gate
+- robust 12-D -> 21-D actor/critic checkpoint transfer
+- exact preservation of old 12 observation columns
+- zero initialization for the nine new input columns
+- fresh v0.5 optimizer and lower exploration noise
+- `import_v04_checkpoint.ps1`, `verify_transfer.ps1`, `smoke_lookahead.ps1`, `train_lookahead.ps1`, `play_lookahead.ps1`
+- transfer and look-ahead geometry unit tests
+
 ## v0.4.0 — Gate Racing Curriculum
 
 Added:

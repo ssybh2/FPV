@@ -18,8 +18,8 @@ Write-Host "[2/4] Installing workspace in editable mode"
 & $IsaacPython -m pip install -e . --no-build-isolation
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-Write-Host "[3/4] Running pure dynamics/control/RL/gate math tests"
-& $IsaacPython -m unittest discover -s tests -v
+Write-Host "[3/4] Running pure dynamics/control/RL/look-ahead tests"
+& $IsaacPython -m pytest -q
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Write-Host "[4/4] Printing Q250 model summary"
@@ -27,8 +27,10 @@ Write-Host "[4/4] Printing Q250 model summary"
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Write-Host ""
-Write-Host "Setup complete. Gate Racing next steps:"
-Write-Host "  .\smoke_gate.ps1"
-Write-Host "  .\train_gate.ps1 -NumEnvs 512 -MaxIterations 400"
+Write-Host "Setup complete. Look-Ahead Racing next steps:"
+Write-Host "  .\import_v04_checkpoint.ps1"
+Write-Host "  .\smoke_lookahead.ps1"
+Write-Host "  .\verify_transfer.ps1"
+Write-Host "  .\train_lookahead.ps1 -NumEnvs 512 -MaxIterations 450"
 Write-Host "  .\tensorboard.ps1"
-Write-Host "  .\play_gate.ps1 -Stage 2 -Duration 0 -RealTime"
+Write-Host "  .\play_lookahead.ps1 -Stage 2 -Duration 0 -RealTime"
